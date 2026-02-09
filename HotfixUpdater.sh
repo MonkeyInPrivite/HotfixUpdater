@@ -151,6 +151,10 @@ if version_gt "$LATEST_VERSION" "$CURRENT_VERSION"; then
         timed_exit
     fi
     echo "[@] Download Complete: $DOWNLOAD_BIN"
+
+    echo "[!!!] The Hotfix Will Install & Initialise In 10s. Wait Until GUI Restart." # Lots Of FBINK Drawing Happens Now, Give The User Feedback.
+    sleep 10
+
     if ! extract_and_run; then
         echo "[!] Update Installation Failed!"
         timed_exit
@@ -158,6 +162,7 @@ if version_gt "$LATEST_VERSION" "$CURRENT_VERSION"; then
     echo "[@] Running Hotfix..."
     /bin/sh /var/local/kmc/hotfix/run_hotfix.sh >/dev/null 2>&1
     echo "[@] Hotfix Installed!"
+    rm -f $DOWNLOAD_BIN >/dev/null 2>&1
     timed_exit 0
 else
     echo "[@] You Are On The Latest Version."
