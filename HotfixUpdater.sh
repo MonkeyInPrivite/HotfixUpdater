@@ -100,8 +100,7 @@ if [ ! -f "$VERSION_FILE" ]; then
     timed_exit
 fi
 
-CURRENT_VERSION_RAW="$(cat "$VERSION_FILE")"
-CURRENT_VERSION="$(normalize_version "$CURRENT_VERSION_RAW")"
+CURRENT_VERSION=$(grep '^HOTFIX_VERSION=' /var/local/kmc/hotfix/libhotfixutils | cut -d'=' -f2 | tr -d '"')
 
 if [ -z "$CURRENT_VERSION" ]; then
     echo "[!] Version File Is Empty!"
