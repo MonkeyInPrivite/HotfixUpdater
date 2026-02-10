@@ -52,6 +52,10 @@ cleanup_tmp() {
     fi
 }
 
+normalize_version() {
+    echo "$1" | tr -d '\r\n ' | sed 's/^v//'
+}
+
 extract_and_run() {
     KT_BIN="$(get_kindletool)"
     if [ ! -x "$KT_BIN" ]; then
