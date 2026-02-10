@@ -52,10 +52,6 @@ cleanup_tmp() {
     fi
 }
 
-normalize_version() {
-    echo "$1" | tr -d '\r\n ' | sed 's/^v//'
-}
-
 extract_and_run() {
     KT_BIN="$(get_kindletool)"
     if [ ! -x "$KT_BIN" ]; then
@@ -100,8 +96,7 @@ if [ ! -f "$VERSION_FILE" ]; then
     timed_exit
 fi
 
-CURRENT_VERSION_RAW="$(cat "$VERSION_FILE")"
-CURRENT_VERSION="$(normalize_version "$CURRENT_VERSION_RAW")"
+CURRENT_VERSION=$(grep '^HOTFIX_VERSION=' /var/local/kmc/hotfix/libhotfixutils | cut -d'=' -f2 | tr -d '"')
 
 if [ -z "$CURRENT_VERSION" ]; then
     echo "[!] Version File Is Empty!"
