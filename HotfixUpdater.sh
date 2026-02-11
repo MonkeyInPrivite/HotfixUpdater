@@ -1,24 +1,24 @@
 #!/bin/sh
 # Name: Update Hotfix
 # Author: KindleTweaks
+# DontUseFBInk
 
-VERSION_FILE="/mnt/us/documents/Run Hotfix.run_hotfix"
 REPO_API="https://api.github.com/repos/KindleModding/Hotfix/releases/latest"
-
 BASE_DIR="/mnt/us/documents/HotfixUpdater"
 DOWNLOAD_BIN="$BASE_DIR/Update.bin"
 TMP_DIR="$BASE_DIR/TMP"
-
 KT_HF="$BASE_DIR/KTHF"
 KT_PW2="$BASE_DIR/KTPW2"
-
 BIN_NAME="Update_hotfix_universal.bin"
 
-timed_exit() {
-    CODE="${1:-1}"
-    echo "[!] Closing In 10s..."
-    sleep 10
-    exit "$CODE"
+alert() {
+    TITLE="$1"
+    TEXT="$2"
+    TITLE_ESC=$(printf '%s' "$TITLE" | sed 's/"/\\"/g')
+    TEXT_ESC=$(printf '%s' "$TEXT" | sed 's/"/\\"/g')
+    JSON='{ "clientParams":{ "alertId":"appAlert1", "show":true, "customStrings":[ { "matchStr":"alertTitle", "replaceStr":"'"$TITLE_ESC"'" }, { "matchStr":"alertText", "replaceStr":"'"$TEXT_ESC"'" } ] } }'
+
+    lipc-set-prop com.lab126.pillow pillowAlert "$JSON"
 }
 
 detect_device() {
@@ -59,111 +59,115 @@ normalize_version() {
 extract_and_run() {
     KT_BIN="$(get_kindletool)"
     if [ ! -x "$KT_BIN" ]; then
-        echo "[!] KindleTool Not Found Or Not Executable!"
+        alert "HotfixUpdater - Attention" "KindleTool not found or not executable!"
         return 1
     fi
-    echo "[*] Using KindleTool: $KT_BIN"
+
+    alert "HotfixUpdater - Info" "Using KindleTool: $KT_BIN"
     cleanup_tmp
     mkdir -p "$TMP_DIR" >/dev/null 2>&1
-    echo "[*] Extracting Update..."
+
+    alert "HotfixUpdater - Info" "Extracting update..."
     if ! "$KT_BIN" extract "$DOWNLOAD_BIN" "$TMP_DIR" >/dev/null 2>&1; then
-        echo "[!] Extraction Failed!"
+        alert "HotfixUpdater - Attention" "Extraction failed!"
         return 1
     fi
-    echo "[*] Remounting Root RW..."
+
+    alert "HotfixUpdater - Info" "Remounting root RW..."
     if ! rw_root; then
-        echo "[!] Failed To Remount Root RW!"
+        alert "HotfixUpdater - Attention" "Failed to remount root RW!"
         return 1
     fi
-    echo "[*] Running Payload Scripts..."
+
+    alert "HotfixUpdater - Info" "Running payload scripts..."
     cd "$TMP_DIR" || return 1
     for f in *.sh; do
         [ -f "$f" ] || continue
-        echo "[*] Running $f"
+
+        alert "HotfixUpdater - Info" "Running $f"
+
         if ! sh "$f" >/dev/null 2>&1; then
-            echo "[!] Script Failed: $f"
+            alert "HotfixUpdater - Attention" "Script failed: $f"
             ro_root
             return 1
         fi
     done
-    echo "[*] Remounting Root RO..."
+
+    alert "HotfixUpdater - Info" "Remounting root RO..."
+
     ro_root
     cleanup_tmp
-    echo "[@] Update Applied Successfully."
+
+    alert "HotfixUpdater - Success" "Update applied successfully."
+
     return 0
 }
 
-echo "[*] Checking Hotfix Version..."
-
-if [ ! -f "$VERSION_FILE" ]; then
-    echo "[!] Version File Not Found: $VERSION_FILE!"
-    timed_exit
-fi
+alert "HotfixUpdater - Info" "Checking hotfix version..."
 
 CURRENT_VERSION=$(grep '^HOTFIX_VERSION=' /var/local/kmc/hotfix/libhotfixutils | cut -d'=' -f2 | tr -d '"')
 
 if [ -z "$CURRENT_VERSION" ]; then
-    echo "[!] Version File Is Empty!"
-    timed_exit
+    alert "HotfixUpdater - Attention" "Cannot detect version!"
+    exit 1
 fi
 
-echo "[*] Installed Version: v$CURRENT_VERSION!"
+alert "HotfixUpdater - Info" "Installed version: v$CURRENT_VERSION!"
 
 RELEASE_JSON="$(curl -fsL "$REPO_API")"
 
 if [ $? -ne 0 ] || [ -z "$RELEASE_JSON" ]; then
-    echo "[!] Failed To Fetch Release Info!"
-    timed_exit
+    alert "HotfixUpdater - Attention" "Failed to fetch release info!"
+    exit 1
 fi
 
 LATEST_VERSION_RAW="$(echo "$RELEASE_JSON" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')"
 LATEST_VERSION="$(normalize_version "$LATEST_VERSION_RAW")"
 
 if [ -z "$LATEST_VERSION" ]; then
-    echo "[!] Failed To Parse Latest Version!"
-    timed_exit
+    alert "HotfixUpdater - Attention" "Failed to parse latest version!"
+    exit 1
 fi
 
-echo "[*] Latest Version: v$LATEST_VERSION!"
+alert "HotfixUpdater - Info" "Latest version: v$LATEST_VERSION!"
 
 version_gt() {
     [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -n1)" = "$1" ] && [ "$1" != "$2" ]
 }
 
 if [ "$LATEST_VERSION" = "$CURRENT_VERSION" ]; then
-    echo "[@] You Are On The Latest Version."
-    timed_exit 0
+    alert "HotfixUpdater - Success" "You are on the latest version."
+    exit 0
 fi
 
 if version_gt "$LATEST_VERSION" "$CURRENT_VERSION"; then
-    echo "[*] Update Available!"
+    alert "HotfixUpdater - Info" "Update available!"
     DOWNLOAD_URL="$(echo "$RELEASE_JSON" | grep '"browser_download_url"' | grep "$BIN_NAME" | sed -E 's/.*"([^"]+)".*/\1/')"
     if [ -z "$DOWNLOAD_URL" ]; then
-        echo "[!] Failed To Find $BIN_NAME In Release!"
-        timed_exit
+        alert "HotfixUpdater - Attention" "Failed to find $BIN_NAME in release!"
+        exit 1
     fi
-    echo "[*] Downloading Update..."
-    echo "[*] $DOWNLOAD_URL"
+
+    alert "HotfixUpdater - Info" "Downloading update...\n$DOWNLOAD_URL"
     mkdir -p "$BASE_DIR" >/dev/null 2>&1
     if ! curl -sSfL "$DOWNLOAD_URL" -o "$DOWNLOAD_BIN"; then
-        echo "[!] Download Failed!"
-        timed_exit
+        alert "HotfixUpdater - Attention" "Download failed!"
+        exit 1
     fi
-    echo "[@] Download Complete: $DOWNLOAD_BIN"
 
-    echo "[!!!] The Hotfix Will Install & Initialise In 10s. Wait Until GUI Restart." # Lots Of FBINK Drawing Happens Now, Give The User Feedback.
-    sleep 10
-
+    alert "HotfixUpdater - Success" "Download complete: $DOWNLOAD_BIN"
+    alert "HotfixUpdater - Info" "The Hotfix will install & initialise now.\nWait until GUI restart."
     if ! extract_and_run; then
-        echo "[!] Update Installation Failed!"
-        timed_exit
+        alert "HotfixUpdater - Attention" "Update installation failed!"
+        exit 1
     fi
-    echo "[@] Running Hotfix..."
+
+    alert "HotfixUpdater - Info" "Running Hotfix..."
     /bin/sh /var/local/kmc/hotfix/run_hotfix.sh >/dev/null 2>&1
-    echo "[@] Hotfix Installed!"
+    alert "HotfixUpdater - Success" "Hotfix installed!"
     rm -f $DOWNLOAD_BIN >/dev/null 2>&1
-    timed_exit 0
+    exit 0
 else
-    echo "[@] You Are On The Latest Version."
-    timed_exit 0
+    alert "HotfixUpdater - Success" "You are on the latest version."
+    exit 0
 fi
