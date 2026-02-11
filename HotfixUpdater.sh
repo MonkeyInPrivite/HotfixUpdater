@@ -38,14 +38,6 @@ get_kindletool() {
     fi
 }
 
-rw_root() {
-    mount -o remount,rw / >/dev/null 2>&1
-}
-
-ro_root() {
-    mount -o remount,ro / >/dev/null 2>&1
-}
-
 cleanup_tmp() {
     if [ -d "$TMP_DIR" ]; then
         rm -rf "$TMP_DIR" >/dev/null 2>&1
@@ -54,6 +46,19 @@ cleanup_tmp() {
 
 normalize_version() {
     echo "$1" | tr -d '\r\n ' | sed 's/^v//'
+}
+
+version_gt() {
+    awk -v v1="$1" -v v2="$2" '
+    BEGIN {
+        split(v1, a, ".");
+        split(v2, b, ".");
+        for (i = 1; i <= 3; i++) {
+            if (a[i] + 0 > b[i] + 0) exit 0;
+            if (a[i] + 0 < b[i] + 0) exit 1;
+        }
+        exit 1;
+    }'
 }
 
 extract_and_run() {
@@ -74,39 +79,35 @@ extract_and_run() {
     fi
 
     alert "HotfixUpdater - Info" "Remounting root RW..."
-    if ! rw_root; then
+    if ! mount -o remount,rw / >/dev/null 2>&1; then
         alert "HotfixUpdater - Attention" "Failed to remount root RW!"
         return 1
     fi
 
     alert "HotfixUpdater - Info" "Running payload scripts..."
     cd "$TMP_DIR" || return 1
+
     for f in *.sh; do
         [ -f "$f" ] || continue
 
         alert "HotfixUpdater - Info" "Running $f"
-
         if ! sh "$f" >/dev/null 2>&1; then
             alert "HotfixUpdater - Attention" "Script failed: $f"
-            ro_root
+            mount -o remount,ro / >/dev/null 2>&1
             return 1
         fi
     done
-
     alert "HotfixUpdater - Info" "Remounting root RO..."
+    mount -o remount,ro / >/dev/null 2>&1
 
-    ro_root
     cleanup_tmp
-
     alert "HotfixUpdater - Success" "Update applied successfully."
-
     return 0
 }
 
 alert "HotfixUpdater - Info" "Checking hotfix version..."
 
 CURRENT_VERSION=$(grep '^HOTFIX_VERSION=' /var/local/kmc/hotfix/libhotfixutils | cut -d'=' -f2 | tr -d '"')
-
 if [ -z "$CURRENT_VERSION" ]; then
     alert "HotfixUpdater - Attention" "Cannot detect version!"
     exit 1
@@ -115,7 +116,6 @@ fi
 alert "HotfixUpdater - Info" "Installed version: v$CURRENT_VERSION!"
 
 RELEASE_JSON="$(curl -fsL "$REPO_API")"
-
 if [ $? -ne 0 ] || [ -z "$RELEASE_JSON" ]; then
     alert "HotfixUpdater - Attention" "Failed to fetch release info!"
     exit 1
@@ -123,18 +123,12 @@ fi
 
 LATEST_VERSION_RAW="$(echo "$RELEASE_JSON" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')"
 LATEST_VERSION="$(normalize_version "$LATEST_VERSION_RAW")"
-
 if [ -z "$LATEST_VERSION" ]; then
     alert "HotfixUpdater - Attention" "Failed to parse latest version!"
     exit 1
 fi
 
 alert "HotfixUpdater - Info" "Latest version: v$LATEST_VERSION!"
-
-version_gt() {
-    [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -n1)" = "$1" ] && [ "$1" != "$2" ]
-}
-
 if [ "$LATEST_VERSION" = "$CURRENT_VERSION" ]; then
     alert "HotfixUpdater - Success" "You are on the latest version."
     exit 0
@@ -142,6 +136,7 @@ fi
 
 if version_gt "$LATEST_VERSION" "$CURRENT_VERSION"; then
     alert "HotfixUpdater - Info" "Update available!"
+
     DOWNLOAD_URL="$(echo "$RELEASE_JSON" | grep '"browser_download_url"' | grep "$BIN_NAME" | sed -E 's/.*"([^"]+)".*/\1/')"
     if [ -z "$DOWNLOAD_URL" ]; then
         alert "HotfixUpdater - Attention" "Failed to find $BIN_NAME in release!"
@@ -156,7 +151,9 @@ if version_gt "$LATEST_VERSION" "$CURRENT_VERSION"; then
     fi
 
     alert "HotfixUpdater - Success" "Download complete: $DOWNLOAD_BIN"
-    alert "HotfixUpdater - Info" "The Hotfix will install & initialise now.\nWait until GUI restart."
+    alert "HotfixUpdater - Info" "The Hotfix will install & initialise in 10s.\nWait until GUI restart."
+    sleep 10
+
     if ! extract_and_run; then
         alert "HotfixUpdater - Attention" "Update installation failed!"
         exit 1
@@ -164,8 +161,9 @@ if version_gt "$LATEST_VERSION" "$CURRENT_VERSION"; then
 
     alert "HotfixUpdater - Info" "Running Hotfix..."
     /bin/sh /var/local/kmc/hotfix/run_hotfix.sh >/dev/null 2>&1
+
     alert "HotfixUpdater - Success" "Hotfix installed!"
-    rm -f $DOWNLOAD_BIN >/dev/null 2>&1
+    rm -f "$DOWNLOAD_BIN" >/dev/null 2>&1
     exit 0
 else
     alert "HotfixUpdater - Success" "You are on the latest version."
