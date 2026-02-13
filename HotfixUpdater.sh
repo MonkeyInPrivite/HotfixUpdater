@@ -74,6 +74,7 @@ extract_and_run() {
         else
           alert "HotfixUpdater - Attention" "KindleTool Download Failed"
           return 1
+        fi
     fi
 
     alert "HotfixUpdater - Info" "Using KindleTool: $KT_BIN"
