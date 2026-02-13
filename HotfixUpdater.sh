@@ -8,7 +8,7 @@ REPO_API="https://api.github.com/repos/KindleModding/Hotfix/releases/latest"
 BASE_DIR="/mnt/us/documents/HotfixUpdater"
 DOWNLOAD_BIN="$BASE_DIR/Update.bin"
 TMP_DIR="$BASE_DIR/TMP"
-KT_REPO_DIR="https://github.com/KindleTweaks/HotfixUpdater/blob/main/HotfixUpdater"
+KT_REPO_DIR="https://raw.githubusercontent.com/KindleTweaks/HotfixUpdater/main/HotfixUpdater"
 KT_HF="$BASE_DIR/KTHF"
 KT_PW2="$BASE_DIR/KTPW2"
 BIN_NAME="Update_hotfix_universal.bin"
@@ -68,9 +68,9 @@ extract_and_run() {
     if [ ! -x "$KT_BIN" ]; then
         alert "HotfixUpdater - Attention" "Downloading KindleTool..."
         if [ "$(detect_device)" = "HF" ]; then
-          curl -OfsL "$KT_HF" "$KT_REPO_DIR/KTHF"
+          curl -fsL -o "$KT_HF" "$KT_REPO_DIR/KTHF"
         elif [ "$(detect_device)" = "PW2" ]; then
-          curl -OfsL "$KT_PW2" "$KT_REPO_DIR/KTPW2"
+          curl -fsL -o "$KT_PW2" "$KT_REPO_DIR/KTPW2"
         else
           alert "HotfixUpdater - Attention" "KindleTool Download Failed"
           return 1
