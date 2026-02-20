@@ -8,6 +8,7 @@ REPO_API="https://api.github.com/repos/KindleModding/Hotfix/releases/latest"
 BASE_DIR="/mnt/us/documents/HotfixUpdater"
 DOWNLOAD_BIN="$BASE_DIR/Update.bin"
 TMP_DIR="$BASE_DIR/TMP"
+KT_REPO_DIR="https://raw.githubusercontent.com/KindleTweaks/HotfixUpdater/main/HotfixUpdater"
 KT_HF="$BASE_DIR/KTHF"
 KT_PW2="$BASE_DIR/KTPW2"
 BIN_NAME="Update_hotfix_universal.bin"
@@ -65,8 +66,15 @@ version_gt() {
 extract_and_run() {
     KT_BIN="$(get_kindletool)"
     if [ ! -x "$KT_BIN" ]; then
-        alert "HotfixUpdater - Attention" "KindleTool not found or not executable!"
-        return 1
+        alert "HotfixUpdater - Attention" "Downloading KindleTool..."
+        if [ "$(detect_device)" = "HF" ]; then
+          curl -fsL -o "$KT_HF" "$KT_REPO_DIR/KTHF"
+        elif [ "$(detect_device)" = "PW2" ]; then
+          curl -fsL -o "$KT_PW2" "$KT_REPO_DIR/KTPW2"
+        else
+          alert "HotfixUpdater - Attention" "KindleTool Download Failed"
+          return 1
+        fi
     fi
 
     alert "HotfixUpdater - Info" "Using KindleTool: $KT_BIN"
