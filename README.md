@@ -12,7 +12,7 @@ HotfixUpdater is a simple on-device Hotfix updater for Kindles, automating the p
 ## Installation
 
 1. Grab the latest file from Releases
-2. Move it to the `documents` folder on your Kindle
+2. Copy it to the `documents/` folder on your Kindle.
 3. Run the scriptlet, and watch it go!
 
 ## Prerequisites
